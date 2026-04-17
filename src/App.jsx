@@ -1,23 +1,49 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, set, get, remove, child } from 'firebase/database';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDCKnaQgm40GjaAR0gPEXu9Gkf2TZyTHA0",
+  authDomain: "emart24lotto.firebaseapp.com",
+  databaseURL: "https://emart24lotto-default-rtdb.firebaseio.com",
+  projectId: "emart24lotto",
+  storageBucket: "emart24lotto.firebasestorage.app",
+  messagingSenderId: "321847097822",
+  appId: "1:321847097822:web:6685d7e295d8b0e9a1854f"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getDatabase(firebaseApp);
+
 window._storage = {
-  data: JSON.parse(localStorage.getItem('sijae_data') || '{}'),
   async get(key) {
-    const v = this.data[key];
-    return v ? { value: v } : null;
+    try {
+      const snap = await get(child(ref(db), 'data/' + key.replace(/[.#$[\]]/g, '_')));
+      if (snap.exists()) return { value: snap.val() };
+      return null;
+    } catch(e) { return null; }
   },
   async set(key, value) {
-    this.data[key] = value;
-    localStorage.setItem('sijae_data', JSON.stringify(this.data));
-    return { key, value };
+    try {
+      await set(ref(db, 'data/' + key.replace(/[.#$[\]]/g, '_')), value);
+      return { key, value };
+    } catch(e) { return null; }
   },
   async delete(key) {
-    delete this.data[key];
-    localStorage.setItem('sijae_data', JSON.stringify(this.data));
-    return { key, deleted: true };
+    try {
+      await remove(ref(db, 'data/' + key.replace(/[.#$[\]]/g, '_')));
+      return { key, deleted: true };
+    } catch(e) { return null; }
   },
   async list(prefix) {
-    const keys = Object.keys(this.data).filter(k => k.startsWith(prefix));
-    return { keys };
+    try {
+      const snap = await get(ref(db, 'data'));
+      if (!snap.exists()) return { keys: [] };
+      const keys = Object.keys(snap.val())
+        .filter(k => k.startsWith(prefix.replace(/[.#$[\]]/g, '_')))
+        .map(k => k);
+      return { keys };
+    } catch(e) { return { keys: [] }; }
   }
 };
 import {
