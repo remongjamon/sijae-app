@@ -769,7 +769,7 @@ function ReportView({ recs, sett }) {
   }, [mode, anchor]);
 
   const data = useMemo(() => {
-    let sales = 0, pay = 0, dep = 0, va = 0, tk1 = 0, tk2 = 0, pen = 0, n = 0;
+    let sales = 0, pay = 0, dep = 0, va = 0, tk1 = 0, tk2 = 0, pen = 0, lottoSales = 0, lottoPay = 0, n = 0;
     const vbd = {};
     Object.entries(recs).forEach(([k, rec]) => {
       const parts = k.split(':');
@@ -780,11 +780,11 @@ function ReportView({ recs, sett }) {
       const d = calcDerived(rec, sh, lr, sett.sijae);
       sales += d.totalSales; pay += d.totalPay;
       dep += d.deposit || 0; va += d.variance || 0;
-      tk1 += d.t1; tk2 += d.t2; pen += toN(rec.pension);
+      tk1 += d.t1; tk2 += d.t2; pen += toN(rec.pension); lottoSales += d.pureSales; lottoPay += d.purePay;
       n++;
       if (d.variance != null && d.variance !== 0) vbd[ds] = (vbd[ds] || 0) + d.variance;
     });
-    return { n, sales, pay, dep, va, tk1, tk2, pen, vbd };
+    return { n, sales, pay, dep, va, tk1, tk2, pen, lottoSales, lottoPay, vbd };
   }, [recs, range, sett.sijae]);
 
   const txt = useMemo(() => {
@@ -837,20 +837,26 @@ function ReportView({ recs, sett }) {
         <div className="text-sm font-semibold tabular-nums">{range.l}</div>
         <button onClick={() => sh(1)} className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-500"><ChevronRight size={18} /></button>
       </div>
-      <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-2.5">
+      <div className="bg-white rounded-2xl border border-stone-200 p-4">
+       <div className="space-y-2.5">
         <StatRow label="총 판매액" value={won(data.sales) + '원'} big />
         <StatRow label="총 지급액" value={won(data.pay) + '원'} />
         <StatRow label="총 입금액" value={won(data.dep) + '원'} />
         <div className="border-t border-stone-100 pt-2.5">
-          <StatRow label="차액 합계" value={(data.va > 0 ? '+' : '') + won(data.va) + '원'} tone={data.va === 0 ? 'ok' : 'warn'} big />
-        </div>
-        <div className="border-t border-stone-100 pt-2.5 grid grid-cols-2 gap-2 text-[11px]">
-          <div><span className="text-stone-500">1000원 </span><b>{data.tk1}매</b></div>
-          <div><span className="text-stone-500">2000원 </span><b>{data.tk2}매</b></div>
-          <div><span className="text-stone-500">연금 </span><b>{won(data.pen)}원</b></div>
-          <div><span className="text-stone-500">기록 </span><b>{data.n}건</b></div>
+         <StatRow label="차액 합계" value={(data.va > 0 ? '+' : '') + won(data.va) + '원'} tone={data.va === 0 ? 'ok' : 'warn'} big />
         </div>
       </div>
+      <div className="mt-4 pt-4 border-t border-stone-100 space-y-2.5">
+       <StatRow label="로또 판매액" value={won(data.lottoSales) + '원'} />
+       <StatRow label="로또 지급액" value={won(data.lottoPay) + '원'} />
+      </div>
+      <div className="mt-4 pt-4 border-t border-stone-100 grid grid-cols-2 gap-2 text-[11px]">
+       <div><span className="text-stone-500">1000원 </span><b>{data.tk1}매</b></div>
+       <div><span className="text-stone-500">2000원 </span><b>{data.tk2}매</b></div>
+       <div><span className="text-stone-500">연금 </span><b>{won(data.pen)}원</b></div>
+       <div><span className="text-stone-500">기록 </span><b>{data.n}건</b></div>
+      </div>
+    </div>  
       <Sec t="공유용 텍스트" sub="복사 후 단톡방에 붙여넣기">
         <div className="bg-stone-900 text-stone-100 rounded-2xl p-3 text-[10px] whitespace-pre-wrap font-mono leading-relaxed">{txt}</div>
         <button onClick={cp}
