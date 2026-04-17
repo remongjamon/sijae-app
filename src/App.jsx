@@ -946,9 +946,9 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
     return days.map((d) => {
       if (d.ds >= initDate) {
         run = {
-          t1: run.t1 + d.inc.t1 - d.sold.t1,
-          t2: run.t2 + d.inc.t2 - d.sold.t2,
-          pen: run.pen + d.inc.pen - d.sold.pen,
+          t1: run.t1 + (d.inc.t1 || 0) - (d.inc.r1 || 0) - d.sold.t1,
+          t2: run.t2 + (d.inc.t2 || 0) - (d.inc.r2 || 0) - d.sold.t2,
+          pen: run.pen + (d.inc.pen || 0) - (d.inc.rpen || 0) - d.sold.pen,
         };
       }
       return { ...d, stock: { ...run } };
