@@ -956,13 +956,23 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
   }, [days, initStock, incoming, recs]);
 
   const openEdit = (ds) => {
-    const inc = incoming[ds] || { t1: 0, t2: 0, pen: 0 };
-    setIncF({ t1: inc.t1 ? String(inc.t1) : '', t2: inc.t2 ? String(inc.t2) : '', pen: inc.pen ? String(inc.pen) : '' });
+    const inc = incoming[ds] || { t1: 0, t2: 0, pen: 0, r1: 0, r2: 0, rpen: 0 };
+    setIncF({ 
+      t1: inc.t1 ? String(inc.t1) : '', 
+      t2: inc.t2 ? String(inc.t2) : '', 
+      pen: inc.pen ? String(inc.pen) : '',
+      r1: inc.r1 ? String(inc.r1) : '',
+      r2: inc.r2 ? String(inc.r2) : '',
+      rpen: inc.rpen ? String(inc.rpen) : ''
+    });
     setEditDay(ds);
   };
 
   const saveEdit = () => {
-    const ni = { ...incoming, [editDay]: { t1: toN(incF.t1), t2: toN(incF.t2), pen: toN(incF.pen) } };
+    const ni = { ...incoming, [editDay]: { 
+      t1: toN(incF.t1), t2: toN(incF.t2), pen: toN(incF.pen),
+      r1: toN(incF.r1), r2: toN(incF.r2), rpen: toN(incF.rpen)
+    }};
     onSaveIncoming(ni);
     setEditDay(null);
   };
@@ -1063,17 +1073,34 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
       {editDay && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center p-4 pb-8">
           <div className="bg-white rounded-2xl p-4 w-full max-w-lg">
-            <h3 className="text-sm font-semibold mb-3">{editDay} 입고 수량</h3>
-            <div className="space-y-2">
-              {[['t1', '스피또1000'], ['t2', '스피또2000'], ['pen', '연금복권']].map(([k, l]) => (
-                <div key={k} className="flex items-center gap-3">
-                  <span className="text-xs w-20">{l}</span>
-                  <input type="text" inputMode="numeric" value={incF[k]}
-                    onChange={(e) => setIncF((p) => ({ ...p, [k]: e.target.value.replace(/[^0-9]/g, '') }))}
-                    placeholder="0" className="flex-1 bg-stone-50 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
-                  <span className="text-xs text-stone-400">매</span>
+          <h3 className="text-sm font-semibold mb-3">{editDay} 재고 조정</h3>
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs font-semibold text-blue-600 mb-2">📦 입고</div>
+                <div className="space-y-2">
+                  {[['t1', '스피또1000'], ['t2', '스피또2000'], ['pen', '연금복권']].map(([k, l]) => (
+                  <div key={k} className="flex items-center gap-3">
+                    <span className="text-xs w-20">{l}</span>
+                    <input type="text" inputMode="numeric" value={incF[k]}
+                      onChange={(e) => setIncF((p) => ({ ...p, [k]: e.target.value.replace(/[^0-9]/g, '') }))}
+                      placeholder="0" className="flex-1 bg-stone-50 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+                    <span className="text-xs text-stone-400">매</span>
+                  </div>))}
                 </div>
-              ))}
+              </div>
+              <div className="border-t border-stone-100 pt-3">
+                <div className="text-xs font-semibold text-red-500 mb-2">↩️ 반납</div>
+                <div className="space-y-2">
+                  {[['r1', '스피또1000'], ['r2', '스피또2000'], ['rpen', '연금복권']].map(([k, l]) => (
+                  <div key={k} className="flex items-center gap-3">
+                    <span className="text-xs w-20">{l}</span>
+                    <input type="text" inputMode="numeric" value={incF[k]}
+                      onChange={(e) => setIncF((p) => ({ ...p, [k]: e.target.value.replace(/[^0-9]/g, '') }))}
+                      placeholder="0" className="flex-1 bg-stone-50 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+                    <span className="text-xs text-stone-400">매</span>
+                  </div>))}
+                </div>
+              </div>
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={() => setEditDay(null)} className="flex-1 py-2.5 rounded-xl bg-stone-100 text-stone-700 text-sm font-medium">취소</button>
