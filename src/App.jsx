@@ -248,7 +248,6 @@ export default function App() {
           setRole('admin');
         }
       } catch (e) { setRole('admin'); }
-      setRole('admin');
       try {
         const i = await window._storage.get('incoming', true);
         if (i && i.value) setIncoming(JSON.parse(i.value));
