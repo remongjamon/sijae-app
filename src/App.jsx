@@ -121,7 +121,7 @@ function emptyRec() {
     t1s: '', t1e: '', t2s: '', t2e: '',
     pension: '', lotto: '', lottoPay: '', paperPay: '', transfer: '',
     b50k: '', b10k: '', b5k: '', b1k: '', bEtc: '',
-    note: '', handover: '',
+    note: '', handover: '', martDeposit: '',
   };
 }
 function getCash(r) {
@@ -567,6 +567,13 @@ function InputView({ recs, sett, onSave }) {
         </div>
       </Sec>
 
+      {/* 마트 입금액 - 야간만 */}
+      {shift === '야간' && (
+        <Sec t="마트 입금액">
+          <MoneyIn label="마트 입금액" value={form.martDeposit} onChange={(v) => up('martDeposit', v)} />
+        </Sec>
+      )}
+
       {/* 비고 */}
       <Sec t="비고">
         <textarea value={form.note} onChange={(e) => up('note', e.target.value)}
@@ -589,7 +596,15 @@ function InputView({ recs, sett, onSave }) {
         <SumRow label="현금 총액" value={won(cash)} />
         <div className="border-t border-white/20 my-1.5" />
         <SumRow label="시재 기준" value={won(sett.sijae)} muted />
-        {d.deposit != null && <SumRow label="입금액" value={won(d.deposit)} />}
+        {shift === '야간' && (
+          <SumRow label="마트 입금액" value={won(toN(form.martDeposit))} />
+        )}
+        {d.deposit != null && (
+          <SumRow label="로또 입금액" value={won(d.deposit)} />
+        )}
+        {shift === '야간' && d.deposit != null && (
+          <SumRow label="총 입금액" value={won(d.deposit + toN(form.martDeposit))} />
+        )}
         {d.variance != null && (
           <div className={'flex items-center justify-between pt-1.5 ' + (d.variance === 0 ? 'text-emerald-300' : 'text-red-300')}>
             <span className="text-xs font-semibold flex items-center gap-1">
