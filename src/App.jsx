@@ -921,7 +921,7 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
         if (!rec) return;
         s1 += t1Cnt(rec.t1s, rec.t1e);
         s2 += t2Cnt(rec.t2s, rec.t2e);
-        sp += Math.round(toN(rec.pension) / 1000);
+        sp += Math.floor(toN(rec.pension) / 1000);
       });
       const inc = incoming[ds] || { t1: 0, t2: 0, pen: 0 };
       arr.push({ ds, sold: { t1: s1, t2: s2, pen: sp }, inc });
@@ -940,7 +940,7 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
       if (ds >= initDate && ds < monthStart) {
         preT1 += t1Cnt(rec.t1s, rec.t1e);
         preT2 += t2Cnt(rec.t2s, rec.t2e);
-        prePen += Math.round(toN(rec.pension) / 1000);
+        prePen += Math.floor(toN(rec.pension) / 1000);
       }
     });
     Object.entries(incoming).forEach(([ds, inc]) => {
