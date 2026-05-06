@@ -945,9 +945,9 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
     });
     Object.entries(incoming).forEach(([ds, inc]) => {
       if (ds >= initDate && ds < monthStart) {
-        preIn1 += inc.t1 || 0;
-        preIn2 += inc.t2 || 0;
-        preInP += inc.pen || 0;
+        preIn1 += (inc.t1 || 0) - (inc.r1 || 0);
+        preIn2 += (inc.t2 || 0) - (inc.r2 || 0);
+        preInP += (inc.pen || 0) - (inc.rpen || 0);
       }
     });
 
