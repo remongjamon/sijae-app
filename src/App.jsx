@@ -1362,4 +1362,3 @@ function SettingsView({ sett, devices, onSave, onSaveDevices, onBack }) {
       </button>
     </div>
   );
-}
