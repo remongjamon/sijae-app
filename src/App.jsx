@@ -46,16 +46,18 @@ window._storage = {
     } catch(e) { return { keys: [] }; }
   }
 };
+
 import {
   Calendar, ClipboardList, BarChart3, Package,
   ChevronLeft, ChevronRight, Save, AlertCircle, CheckCircle2,
-  Trash2, Lock, Copy, MessageSquare, Shield, Settings as Gear
+  Trash2, Lock, Copy, MessageSquare, Shield, Settings as Gear, Smartphone
 } from 'lucide-react';
 
 /* ── constants ── */
 const DEF_SIJAE = 240000;
 const R1 = 200;
 const R2 = 100;
+const MAX_DEVICES = 10;
 const SHIFTS = ['오전', '오후', '야간'];
 const SC = {
   '오전': 'bg-amber-100 text-amber-700',
@@ -150,6 +152,16 @@ function calcDerived(rec, shift, refRec, sijae) {
   return { t1, t2, pureSales, purePay, totalSales, totalPay, variance, deposit, cash };
 }
 
+/* ── device id ── */
+function getDeviceId() {
+  let id = localStorage.getItem('device_id');
+  if (!id) {
+    id = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    localStorage.setItem('device_id', id);
+  }
+  return id;
+}
+
 /* ── small shared components ── */
 function Sec({ t, sub, children }) {
   return (
@@ -167,10 +179,7 @@ function NavBtn({ active, onClick, icon, label, locked }) {
   return (
     <button
       onClick={onClick}
-      className={
-        'flex flex-col items-center gap-0.5 py-2 transition ' +
-        (active ? 'text-stone-900' : 'text-stone-400')
-      }
+      className={'flex flex-col items-center gap-0.5 py-2 transition ' + (active ? 'text-stone-900' : 'text-stone-400')}
     >
       {icon}
       <span className="text-[10px] font-medium flex items-center gap-0.5">
@@ -211,51 +220,157 @@ function PinModal({ pin, onOk, onCancel, onBad }) {
   );
 }
 
+/* ══════ DEVICE REGISTRATION SCREEN ══════ */
+function DeviceRegScreen({ regCode, onRegistered }) {
+  const [step, setStep] = useState('code'); // 'code' | 'name'
+  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+
+  const tryCode = () => {
+    if (code.trim() === regCode) {
+      setError('');
+      setStep('name');
+    } else {
+      setError('등록 코드가 올바르지 않습니다');
+      setCode('');
+    }
+  };
+
+  const tryName = async () => {
+    if (!name.trim()) { setError('이름을 입력해주세요'); return; }
+    onRegistered(name.trim());
+  };
+
+  return (
+    <div className="min-h-screen bg-stone-900 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-xs">
+        <div className="text-center mb-5">
+          <div className="w-12 h-12 rounded-xl bg-stone-900 flex items-center justify-center mx-auto mb-3">
+            <span className="text-white text-lg font-bold">₩</span>
+          </div>
+          <h1 className="text-base font-bold">시재 관리</h1>
+          <p className="text-xs text-stone-500 mt-1">
+            {step === 'code' ? '기기 등록 코드를 입력하세요' : '근무자 이름을 입력하세요'}
+          </p>
+        </div>
+
+        {step === 'code' ? (
+          <>
+            <input
+              type="text" autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') tryCode(); }}
+              placeholder="등록 코드"
+              className={'w-full bg-stone-50 border rounded-xl px-3 py-2.5 text-center text-sm tracking-widest focus:outline-none mb-2 ' + (error ? 'border-red-400 bg-red-50' : 'border-stone-200')}
+            />
+            {error && <p className="text-xs text-red-500 text-center mb-2">{error}</p>}
+            <button onClick={tryCode} className="w-full bg-stone-900 text-white py-2.5 rounded-xl font-semibold text-sm">
+              확인
+            </button>
+          </>
+        ) : (
+          <>
+            <input
+              type="text" autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') tryName(); }}
+              placeholder="예) 홍길동"
+              className={'w-full bg-stone-50 border rounded-xl px-3 py-2.5 text-center text-sm focus:outline-none mb-2 ' + (error ? 'border-red-400 bg-red-50' : 'border-stone-200')}
+            />
+            {error && <p className="text-xs text-red-500 text-center mb-2">{error}</p>}
+            <button onClick={tryName} className="w-full bg-stone-900 text-white py-2.5 rounded-xl font-semibold text-sm">
+              등록 완료
+            </button>
+            <button onClick={() => { setStep('code'); setError(''); }} className="w-full mt-2 py-2 rounded-xl text-stone-500 text-xs">
+              이전으로
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ══════ APP ══════ */
 export default function App() {
   const [tab, setTab] = useState('input');
   const [recs, setRecs] = useState({});
   const [incoming, setIncoming] = useState({});
   const [initStock, setInitStock] = useState({ t1: 0, t2: 0, pen: 0, date: todayStr() });
-  const [sett, setSett] = useState({ sijae: DEF_SIJAE, pin: '' });
+  const [sett, setSett] = useState({ sijae: DEF_SIJAE, pin: '', regCode: '' });
+  const [devices, setDevices] = useState({});
   const [role, setRole] = useState('staff');
   const [pinCb, setPinCb] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [deviceStatus, setDeviceStatus] = useState('checking'); // 'checking' | 'ok' | 'register' | 'blocked'
+  const deviceId = getDeviceId();
 
   useEffect(() => {
     (async () => {
+      // load settings first
+      let loadedSett = { sijae: DEF_SIJAE, pin: '', regCode: '' };
       try {
-        const res = await window._storage.list('r:', true);
+        const s = await window._storage.get('sett');
+        if (s && s.value) {
+          const p = JSON.parse(s.value);
+          loadedSett = { sijae: p.sijae || DEF_SIJAE, pin: p.pin || '', regCode: p.regCode || '' };
+          setSett(loadedSett);
+          if (!p.pin) setRole('admin');
+        } else {
+          setRole('admin');
+        }
+      } catch (e) { setRole('admin'); }
+
+      // load devices
+      let loadedDevices = {};
+      try {
+        const dv = await window._storage.get('devices');
+        if (dv && dv.value) {
+          loadedDevices = JSON.parse(dv.value);
+          setDevices(loadedDevices);
+        }
+      } catch (e) { /* skip */ }
+
+      // check device registration
+      if (!loadedSett.regCode) {
+        // no reg code set = open access
+        setDeviceStatus('ok');
+      } else if (loadedDevices[deviceId]) {
+        // device registered
+        setDeviceStatus('ok');
+      } else {
+        // need registration
+        setDeviceStatus('register');
+      }
+
+      // load records
+      try {
+        const res = await window._storage.list('r:');
         const all = {};
         if (res && res.keys) {
           await Promise.all(res.keys.map(async (k) => {
             try {
-              const r = await window._storage.get(k, true);
+              const r = await window._storage.get(k);
               if (r && r.value) all[k.replace('r:', '')] = JSON.parse(r.value);
             } catch (e) { /* skip */ }
           }));
         }
         setRecs(all);
       } catch (e) { /* skip */ }
+
       try {
-        const s = await window._storage.get('sett', true);
-        if (s && s.value) {
-          const p = JSON.parse(s.value);
-          setSett({ sijae: p.sijae || DEF_SIJAE, pin: p.pin || '' });
-          if (!p.pin) setRole('admin');
-        } else {
-          setRole('admin');
-        }
-      } catch (e) { setRole('admin'); }
-      try {
-        const i = await window._storage.get('incoming', true);
+        const i = await window._storage.get('incoming');
         if (i && i.value) setIncoming(JSON.parse(i.value));
       } catch (e) { /* skip */ }
       try {
-        const i = await window._storage.get('initStock', true);
+        const i = await window._storage.get('initStock');
         if (i && i.value) setInitStock(JSON.parse(i.value));
       } catch (e) { /* skip */ }
+
       setLoading(false);
     })();
   }, []);
@@ -268,11 +383,29 @@ export default function App() {
     setPinCb(() => fn);
   };
 
+  const handleDeviceRegistered = async (name) => {
+    const count = Object.keys(devices).length;
+    if (count >= MAX_DEVICES) {
+      setDeviceStatus('blocked');
+      return;
+    }
+    const newDevices = { ...devices, [deviceId]: { name, registeredAt: new Date().toISOString() } };
+    try {
+      await window._storage.set('devices', JSON.stringify(newDevices));
+      setDevices(newDevices);
+      localStorage.setItem('device_name', name);
+      setDeviceStatus('ok');
+      flash(name + '님 등록 완료!');
+    } catch (e) {
+      flash('등록 실패', 'err');
+    }
+  };
+
   const saveRec = async (d, sh, data) => {
     const k = d + ':' + sh;
     const r = { ...data, at: new Date().toISOString() };
     try {
-      await window._storage.set('r:' + k, JSON.stringify(r), true);
+      await window._storage.set('r:' + k, JSON.stringify(r));
       setRecs((p) => ({ ...p, [k]: r }));
       flash('저장 완료');
       return true;
@@ -282,7 +415,7 @@ export default function App() {
   const delRec = async (d, sh) => {
     const k = d + ':' + sh;
     try {
-      await window._storage.delete('r:' + k, true);
+      await window._storage.delete('r:' + k);
       setRecs((p) => { const n = { ...p }; delete n[k]; return n; });
       flash('삭제 완료');
     } catch (e) { flash('삭제 실패', 'err'); }
@@ -290,22 +423,30 @@ export default function App() {
 
   const saveSett = async (ns) => {
     try {
-      await window._storage.set('sett', JSON.stringify(ns), true);
+      await window._storage.set('sett', JSON.stringify(ns));
       setSett(ns);
       flash('설정 저장');
     } catch (e) { flash('실패', 'err'); }
   };
 
+  const saveDevices = async (nd) => {
+    try {
+      await window._storage.set('devices', JSON.stringify(nd));
+      setDevices(nd);
+      flash('저장 완료');
+    } catch (e) { flash('실패', 'err'); }
+  };
+
   const saveIncoming = async (ni) => {
     try {
-      await window._storage.set('incoming', JSON.stringify(ni), true);
+      await window._storage.set('incoming', JSON.stringify(ni));
       setIncoming(ni);
     } catch (e) { flash('실패', 'err'); }
   };
 
   const saveInitStock = async (ni) => {
     try {
-      await window._storage.set('initStock', JSON.stringify(ni), true);
+      await window._storage.set('initStock', JSON.stringify(ni));
       setInitStock(ni);
     } catch (e) { flash('실패', 'err'); }
   };
@@ -318,15 +459,34 @@ export default function App() {
     );
   }
 
+  // device blocked (max devices reached)
+  if (deviceStatus === 'blocked') {
+    return (
+      <div className="min-h-screen bg-stone-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-6 w-full max-w-xs text-center">
+          <AlertCircle size={32} className="text-red-500 mx-auto mb-3" />
+          <h2 className="font-bold text-sm mb-1">등록 불가</h2>
+          <p className="text-xs text-stone-500">최대 기기 수({MAX_DEVICES}대)에 도달했습니다. 관리자에게 문의하세요.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // need device registration
+  if (deviceStatus === 'register') {
+    return <DeviceRegScreen regCode={sett.regCode} onRegistered={handleDeviceRegistered} />;
+  }
+
   const isA = role === 'admin';
   const goTab = (t, admin) => {
     if (admin && !isA) { needAdmin(() => setTab(t)); }
     else { setTab(t); }
   };
 
+  const deviceName = devices[deviceId]?.name || localStorage.getItem('device_name') || '';
+
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 pb-20" style={{ fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif' }}>
-      {/* header */}
       <header className="bg-white border-b border-stone-200 sticky top-0 z-20">
         <div className="max-w-lg mx-auto px-4 h-12 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -334,6 +494,11 @@ export default function App() {
               <span className="text-white text-[10px] font-bold">₩</span>
             </div>
             <h1 className="text-sm font-semibold tracking-tight">시재 관리</h1>
+            {deviceName && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-stone-100 text-stone-600 font-medium">
+                {deviceName}
+              </span>
+            )}
             {isA && sett.pin && (
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-stone-900 text-white font-medium flex items-center gap-0.5">
                 <Shield size={8} />관리자
@@ -361,7 +526,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* main */}
       <main className="max-w-lg mx-auto">
         {tab === 'input' && <InputView recs={recs} sett={sett} onSave={saveRec} />}
         {tab === 'history' && (
@@ -374,11 +538,11 @@ export default function App() {
             onSaveIncoming={saveIncoming} onSaveInitStock={saveInitStock} />
         )}
         {tab === 'settings' && (
-          <SettingsView sett={sett} onSave={saveSett} onBack={() => setTab('input')} />
+          <SettingsView sett={sett} devices={devices} onSave={saveSett}
+            onSaveDevices={saveDevices} onBack={() => setTab('input')} />
         )}
       </main>
 
-      {/* bottom nav */}
       {tab !== 'settings' && (
         <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-stone-200 z-20">
           <div className="max-w-lg mx-auto grid grid-cols-4">
@@ -390,7 +554,6 @@ export default function App() {
         </nav>
       )}
 
-      {/* pin modal */}
       {pinCb !== null && (
         <PinModal
           pin={sett.pin}
@@ -400,7 +563,6 @@ export default function App() {
         />
       )}
 
-      {/* toast */}
       {toast && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50">
           <div className={'px-4 py-2 rounded-full text-xs font-medium shadow-lg flex items-center gap-1.5 ' + (toast.k === 'ok' ? 'bg-stone-900 text-white' : 'bg-red-600 text-white')}>
@@ -455,7 +617,6 @@ function InputView({ recs, sett, onSave }) {
 
   return (
     <div className="p-4 space-y-3">
-      {/* date + shift */}
       <div className="bg-white rounded-2xl border border-stone-200 p-3">
         <div className="flex items-center justify-between mb-2">
           <button onClick={() => setDate(addD(dateStr, -1))} className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-500">
@@ -478,7 +639,6 @@ function InputView({ recs, sett, onSave }) {
         </div>
       </div>
 
-      {/* handover from prev */}
       {prev && prev.handover && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
           <div className="flex items-center gap-1.5 mb-1">
@@ -489,7 +649,6 @@ function InputView({ recs, sett, onSave }) {
         </div>
       )}
 
-      {/* lotto ref info for 오후/야간 */}
       {shift !== '오전' && !existing && (
         <div className={'rounded-xl p-2.5 text-[11px] ' + (lRef ? 'bg-blue-50 text-blue-900' : 'bg-amber-50 text-amber-900')}>
           {lRef ? (
@@ -503,15 +662,13 @@ function InputView({ recs, sett, onSave }) {
         </div>
       )}
 
-      {/* ticket numbers */}
-      <Sec t="지류 복권 번호" sub={t1Cnt(form.t1s, form.t1e) + 't1 · ' + t2Cnt(form.t2s, form.t2e) + 't2 매'}>
+      <Sec t="지류 복권 번호" sub={t1Cnt(form.t1s, form.t1e) + 'T1 · ' + t2Cnt(form.t2s, form.t2e) + 'T2 매'}>
         <div className="space-y-1.5">
           <TicketRange label="1000원" sv={form.t1s} ev={form.t1e} os={(v) => up('t1s', v)} oe={(v) => up('t1e', v)} cnt={d.t1} />
           <TicketRange label="2000원" sv={form.t2s} ev={form.t2e} os={(v) => up('t2s', v)} oe={(v) => up('t2e', v)} cnt={d.t2} />
         </div>
       </Sec>
 
-      {/* 판매 */}
       <Sec t="판매">
         <div className="space-y-1.5">
           <MoneyIn label="연금복권" value={form.pension} onChange={(v) => up('pension', v)} />
@@ -519,7 +676,6 @@ function InputView({ recs, sett, onSave }) {
         </div>
       </Sec>
 
-      {/* 지급 */}
       <Sec t="지급">
         <div className="space-y-1.5">
           <MoneyIn label="로또지급" value={form.lottoPay} onChange={(v) => up('lottoPay', v)} />
@@ -527,12 +683,10 @@ function InputView({ recs, sett, onSave }) {
         </div>
       </Sec>
 
-      {/* 정산 */}
       <Sec t="정산">
         <MoneyIn label="계좌이체" value={form.transfer} onChange={(v) => up('transfer', v)} />
       </Sec>
 
-      {/* 현금 세기 */}
       <Sec t="현금 계산" sub={'합계: ' + won(cash) + '원'}>
         <div className="bg-white border border-stone-900 rounded-xl p-3 space-y-2">
           {DENOM.map(({ v: dv, l: dl, k: fk }) => {
@@ -567,28 +721,24 @@ function InputView({ recs, sett, onSave }) {
         </div>
       </Sec>
 
-      {/* 마트 입금액 - 야간만 */}
       {shift === '야간' && (
         <Sec t="마트 입금액">
           <MoneyIn label="마트 입금액" value={form.martDeposit} onChange={(v) => up('martDeposit', v)} />
         </Sec>
       )}
 
-      {/* 비고 */}
       <Sec t="비고">
         <textarea value={form.note} onChange={(e) => up('note', e.target.value)}
           placeholder="특이사항" rows={2}
           className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs resize-none focus:outline-none focus:border-stone-400" />
       </Sec>
 
-      {/* 인수인계 */}
       <Sec t="인수인계" sub="다음 근무 시작 시 표시">
         <textarea value={form.handover} onChange={(e) => up('handover', e.target.value)}
           placeholder="예) 당첨금 25만원 오후 지급 예정" rows={2}
           className="w-full bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs resize-none focus:outline-none focus:border-amber-400" />
       </Sec>
 
-      {/* 요약 */}
       <div className="bg-stone-900 text-white rounded-2xl p-4 space-y-1.5">
         <SumRow label="총 판매액" value={won(d.totalSales)} />
         <SumRow label="총 지급액" value={won(d.totalPay)} />
@@ -617,7 +767,6 @@ function InputView({ recs, sett, onSave }) {
         )}
       </div>
 
-      {/* save */}
       <button onClick={handleSave} disabled={!dirty && !!existing}
         className="w-full bg-stone-900 text-white py-3 rounded-2xl font-semibold text-sm disabled:bg-stone-300 disabled:text-stone-500 flex items-center justify-center gap-2">
         <Save size={15} />
@@ -735,6 +884,7 @@ function HistoryView({ recs, sett, isA, onDel }) {
               <DetailRow l="지류지급" v={won(toN(rec.paperPay)) + '원'} />
               <DetailRow l="계좌이체" v={won(toN(rec.transfer)) + '원'} />
               <DetailRow l="현금총액" v={won(d.cash) + '원'} />
+              {rec.martDeposit && <DetailRow l="마트 입금액" v={won(toN(rec.martDeposit)) + '원'} />}
               {rec.note && <DetailRow l="비고" v={rec.note} />}
               {rec.handover && <DetailRow l="인수인계" v={rec.handover} />}
               {isA && (
@@ -852,25 +1002,25 @@ function ReportView({ recs, sett }) {
         <button onClick={() => sh(1)} className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-500"><ChevronRight size={18} /></button>
       </div>
       <div className="bg-white rounded-2xl border border-stone-200 p-4">
-       <div className="space-y-2.5">
-        <StatRow label="총 판매액" value={won(data.sales) + '원'} big />
-        <StatRow label="총 지급액" value={won(data.pay) + '원'} />
-        <StatRow label="총 입금액" value={won(data.dep) + '원'} />
-        <div className="border-t border-stone-100 pt-2.5">
-         <StatRow label="차액 합계" value={(data.va > 0 ? '+' : '') + won(data.va) + '원'} tone={data.va === 0 ? 'ok' : 'warn'} big />
+        <div className="space-y-2.5">
+          <StatRow label="총 판매액" value={won(data.sales) + '원'} big />
+          <StatRow label="총 지급액" value={won(data.pay) + '원'} />
+          <StatRow label="총 입금액" value={won(data.dep) + '원'} />
+          <div className="border-t border-stone-100 pt-2.5">
+            <StatRow label="차액 합계" value={(data.va > 0 ? '+' : '') + won(data.va) + '원'} tone={data.va === 0 ? 'ok' : 'warn'} big />
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-stone-100 space-y-2.5">
+          <StatRow label="로또 판매액" value={won(data.lottoSales) + '원'} />
+          <StatRow label="로또 지급액" value={won(data.lottoPay) + '원'} />
+        </div>
+        <div className="mt-4 pt-4 border-t border-stone-100 grid grid-cols-2 gap-2 text-[11px]">
+          <div><span className="text-stone-500">1000원 </span><b>{data.tk1}매</b></div>
+          <div><span className="text-stone-500">2000원 </span><b>{data.tk2}매</b></div>
+          <div><span className="text-stone-500">연금 </span><b>{won(data.pen)}원</b></div>
+          <div><span className="text-stone-500">기록 </span><b>{data.n}건</b></div>
         </div>
       </div>
-      <div className="mt-4 pt-4 border-t border-stone-100 space-y-2.5">
-       <StatRow label="로또 판매액" value={won(data.lottoSales) + '원'} />
-       <StatRow label="로또 지급액" value={won(data.lottoPay) + '원'} />
-      </div>
-      <div className="mt-4 pt-4 border-t border-stone-100 grid grid-cols-2 gap-2 text-[11px]">
-       <div><span className="text-stone-500">1000원 </span><b>{data.tk1}매</b></div>
-       <div><span className="text-stone-500">2000원 </span><b>{data.tk2}매</b></div>
-       <div><span className="text-stone-500">연금 </span><b>{won(data.pen)}원</b></div>
-       <div><span className="text-stone-500">기록 </span><b>{data.n}건</b></div>
-      </div>
-    </div>  
       <Sec t="공유용 텍스트" sub="복사 후 단톡방에 붙여넣기">
         <div className="bg-stone-900 text-stone-100 rounded-2xl p-3 text-[10px] whitespace-pre-wrap font-mono leading-relaxed">{txt}</div>
         <button onClick={cp}
@@ -901,7 +1051,7 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
   const [editInit, setEditInit] = useState(false);
   const [initF, setInitF] = useState(initStock);
   const [editDay, setEditDay] = useState(null);
-  const [incF, setIncF] = useState({ t1: '', t2: '', pen: '' });
+  const [incF, setIncF] = useState({ t1: '', t2: '', pen: '', r1: '', r2: '', rpen: '' });
 
   const shM = (delta) => {
     const [y, m] = month.split('-').map(Number);
@@ -971,9 +1121,9 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
 
   const openEdit = (ds) => {
     const inc = incoming[ds] || { t1: 0, t2: 0, pen: 0, r1: 0, r2: 0, rpen: 0 };
-    setIncF({ 
-      t1: inc.t1 ? String(inc.t1) : '', 
-      t2: inc.t2 ? String(inc.t2) : '', 
+    setIncF({
+      t1: inc.t1 ? String(inc.t1) : '',
+      t2: inc.t2 ? String(inc.t2) : '',
       pen: inc.pen ? String(inc.pen) : '',
       r1: inc.r1 ? String(inc.r1) : '',
       r2: inc.r2 ? String(inc.r2) : '',
@@ -983,7 +1133,7 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
   };
 
   const saveEdit = () => {
-    const ni = { ...incoming, [editDay]: { 
+    const ni = { ...incoming, [editDay]: {
       t1: toN(incF.t1), t2: toN(incF.t2), pen: toN(incF.pen),
       r1: toN(incF.r1), r2: toN(incF.r2), rpen: toN(incF.rpen)
     }};
@@ -1001,7 +1151,6 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
         <button onClick={() => shM(1)} className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-500"><ChevronRight size={18} /></button>
       </div>
 
-      {/* init stock */}
       <div className="bg-white rounded-2xl border border-stone-200 p-3">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-semibold text-stone-500">초기 재고 ({initStock.date})</span>
@@ -1044,7 +1193,6 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
         )}
       </div>
 
-      {/* daily table */}
       <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
         <div className="grid grid-cols-12 gap-0 px-3 py-2 bg-stone-100 text-[9px] font-semibold text-stone-500 uppercase">
           <div className="col-span-2">날짜</div>
@@ -1083,36 +1231,37 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
           ))}
       </div>
 
-      {/* edit incoming modal */}
       {editDay && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center p-4 pb-8">
           <div className="bg-white rounded-2xl p-4 w-full max-w-lg">
-          <h3 className="text-sm font-semibold mb-3">{editDay} 재고 조정</h3>
+            <h3 className="text-sm font-semibold mb-3">{editDay} 재고 조정</h3>
             <div className="space-y-3">
               <div>
                 <div className="text-xs font-semibold text-blue-600 mb-2">📦 입고</div>
                 <div className="space-y-2">
                   {[['t1', '스피또1000'], ['t2', '스피또2000'], ['pen', '연금복권']].map(([k, l]) => (
-                  <div key={k} className="flex items-center gap-3">
-                    <span className="text-xs w-20">{l}</span>
-                    <input type="text" inputMode="numeric" value={incF[k]}
-                      onChange={(e) => setIncF((p) => ({ ...p, [k]: e.target.value.replace(/[^0-9]/g, '') }))}
-                      placeholder="0" className="flex-1 bg-stone-50 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
-                    <span className="text-xs text-stone-400">매</span>
-                  </div>))}
+                    <div key={k} className="flex items-center gap-3">
+                      <span className="text-xs w-20">{l}</span>
+                      <input type="text" inputMode="numeric" value={incF[k]}
+                        onChange={(e) => setIncF((p) => ({ ...p, [k]: e.target.value.replace(/[^0-9]/g, '') }))}
+                        placeholder="0" className="flex-1 bg-stone-50 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+                      <span className="text-xs text-stone-400">매</span>
+                    </div>
+                  ))}
                 </div>
               </div>
               <div className="border-t border-stone-100 pt-3">
                 <div className="text-xs font-semibold text-red-500 mb-2">↩️ 반납</div>
                 <div className="space-y-2">
                   {[['r1', '스피또1000'], ['r2', '스피또2000'], ['rpen', '연금복권']].map(([k, l]) => (
-                  <div key={k} className="flex items-center gap-3">
-                    <span className="text-xs w-20">{l}</span>
-                    <input type="text" inputMode="numeric" value={incF[k]}
-                      onChange={(e) => setIncF((p) => ({ ...p, [k]: e.target.value.replace(/[^0-9]/g, '') }))}
-                      placeholder="0" className="flex-1 bg-stone-50 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
-                    <span className="text-xs text-stone-400">매</span>
-                  </div>))}
+                    <div key={k} className="flex items-center gap-3">
+                      <span className="text-xs w-20">{l}</span>
+                      <input type="text" inputMode="numeric" value={incF[k]}
+                        onChange={(e) => setIncF((p) => ({ ...p, [k]: e.target.value.replace(/[^0-9]/g, '') }))}
+                        placeholder="0" className="flex-1 bg-stone-50 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+                      <span className="text-xs text-stone-400">매</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1128,9 +1277,20 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
 }
 
 /* ══════ SETTINGS ══════ */
-function SettingsView({ sett, onSave, onBack }) {
+function SettingsView({ sett, devices, onSave, onSaveDevices, onBack }) {
   const [sijae, setSijae] = useState(String(sett.sijae));
   const [pin, setPin] = useState(sett.pin || '');
+  const [regCode, setRegCode] = useState(sett.regCode || '');
+
+  const deviceList = Object.entries(devices).map(([id, info]) => ({ id, ...info }));
+
+  const handleDelete = (id) => {
+    if (confirm(devices[id]?.name + ' 기기를 삭제할까요?')) {
+      const nd = { ...devices };
+      delete nd[id];
+      onSaveDevices(nd);
+    }
+  };
 
   return (
     <div className="p-4 space-y-4">
@@ -1158,16 +1318,45 @@ function SettingsView({ sett, onSave, onBack }) {
             onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
             placeholder="숫자만" className="w-28 bg-stone-50 rounded-lg px-2 py-1.5 text-xs text-right tabular-nums tracking-widest focus:outline-none focus:ring-1 focus:ring-stone-400" />
         </div>
+      </Sec>
+
+      <Sec t="기기 등록 코드" sub="신규 기기 등록 시 필요">
+        <div className="bg-white border border-stone-200 rounded-xl px-3 py-2.5 flex items-center gap-3">
+          <Smartphone size={14} className="text-stone-400" />
+          <div className="flex-1 text-xs font-medium">등록 코드</div>
+          <input type="text" value={regCode}
+            onChange={(e) => setRegCode(e.target.value)}
+            placeholder="자유롭게 설정"
+            className="w-28 bg-stone-50 rounded-lg px-2 py-1.5 text-xs text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+        </div>
         <div className="text-[10px] text-stone-500 px-1 mt-1 leading-relaxed">
-          관리자: 내역 · 리포트 · 재고 · 삭제 · 설정<br />근무자: 입력만 가능
+          비워두면 누구나 접속 가능 · 퇴사자 생기면 코드 변경 후 재직자에게 재공유
         </div>
       </Sec>
 
-      <div className="bg-blue-50 rounded-xl p-3 text-[10px] text-blue-900 leading-relaxed">
-        <b>공유 모드</b> — 같은 링크로 접속한 사람 모두 같은 데이터를 공유합니다.
-      </div>
+      <Sec t={'등록된 기기 (' + deviceList.length + '/' + MAX_DEVICES + ')'}>
+        {deviceList.length === 0 ? (
+          <div className="text-xs text-stone-400 px-1">등록된 기기 없음</div>
+        ) : (
+          <div className="bg-white border border-stone-200 rounded-xl overflow-hidden divide-y divide-stone-100">
+            {deviceList.map((dv) => (
+              <div key={dv.id} className="flex items-center gap-3 px-3 py-2.5">
+                <Smartphone size={14} className="text-stone-400" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium">{dv.name}</div>
+                  <div className="text-[10px] text-stone-400">{dv.registeredAt ? new Date(dv.registeredAt).toLocaleDateString('ko-KR') : ''}</div>
+                </div>
+                <button onClick={() => handleDelete(dv.id)}
+                  className="p-1.5 text-stone-400 hover:text-red-600">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Sec>
 
-      <button onClick={() => { onSave({ sijae: toN(sijae) || DEF_SIJAE, pin: pin.trim() }); onBack(); }}
+      <button onClick={() => { onSave({ sijae: toN(sijae) || DEF_SIJAE, pin: pin.trim(), regCode: regCode.trim() }); onBack(); }}
         className="w-full bg-stone-900 text-white py-3 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2">
         <Save size={15} /> 저장
       </button>
