@@ -101,6 +101,10 @@ function t1Cnt(s, e, rolls) {
   const a = Number(s), b = Number(e);
   if (isNaN(a) || isNaN(b)) return 0;
   const r = toN(rolls);
+  // 권 값이 없으면 기존 방식 (b < a면 wrap around)
+  if (r === 0) {
+    return b < a ? b - a + R1 + 1 : b - a + 1;
+  }
   return b - a + 1 + (r * R1);
 }
 function t2Cnt(s, e, rolls) {
@@ -108,6 +112,9 @@ function t2Cnt(s, e, rolls) {
   const a = Number(s), b = Number(e);
   if (isNaN(a) || isNaN(b)) return 0;
   const r = toN(rolls);
+  if (r === 0) {
+    return b < a ? b - a + R2 + 1 : b - a + 1;
+  }
   return b - a + 1 + (r * R2);
 }
 function prevKey(d, sh) {
@@ -1159,7 +1166,8 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
         if (!rec) return;
         s1 += t1Cnt(rec.t1s, rec.t1e, rec.t1Rolls);
         s2 += t2Cnt(rec.t2s, rec.t2e, rec.t2Rolls);
-        sp += (toN(rec.pensionSet) * 5 + toN(rec.pensionSingle)) + (rec.pensionSet === '' && rec.pensionSingle === '' && rec.pensionSet == null ? Math.floor(toN(rec.pension) / 1000) : 0);
+        const hasNew = (rec.pensionSet != null && rec.pensionSet !== '') || (rec.pensionSingle != null && rec.pensionSingle !== '');
+        sp += hasNew ? (toN(rec.pensionSet) * 5 + toN(rec.pensionSingle)) : Math.floor(toN(rec.pension) / 1000);
       });
       const inc = incoming[ds] || { t1: 0, t2: 0, pen: 0 };
       arr.push({ ds, sold: { t1: s1, t2: s2, pen: sp }, inc });
@@ -1178,7 +1186,8 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
       if (ds >= initDate && ds < monthStart) {
         preT1 += t1Cnt(rec.t1s, rec.t1e, rec.t1Rolls);
         preT2 += t2Cnt(rec.t2s, rec.t2e, rec.t2Rolls);
-        prePen += (toN(rec.pensionSet) * 5 + toN(rec.pensionSingle)) + (rec.pensionSet === '' && rec.pensionSingle === '' && rec.pensionSet == null ? Math.floor(toN(rec.pension) / 1000) : 0);
+        const hasNewP = (rec.pensionSet != null && rec.pensionSet !== '') || (rec.pensionSingle != null && rec.pensionSingle !== '');
+        prePen += hasNewP ? (toN(rec.pensionSet) * 5 + toN(rec.pensionSingle)) : Math.floor(toN(rec.pension) / 1000);
       }
     });
     Object.entries(incoming).forEach(([ds, inc]) => {
