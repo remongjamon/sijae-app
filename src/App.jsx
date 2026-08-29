@@ -833,13 +833,13 @@ function TicketRange({ label, sv, ev, rv, os, oe, or, cnt }) {
         <span className="text-xs font-medium">{label}</span>
         <span className="text-[10px] text-stone-500 tabular-nums">{cnt}매</span>
       </div>
-      <div className="flex gap-2.5">
+      <div className="flex gap-2 w-full min-w-0">
         <input type="text" inputMode="decimal" value={sv} onChange={(e) => os(e.target.value.replace(/[^0-9]/g, ''))}
-          placeholder="시작" className="flex-1 bg-stone-50 rounded-lg px-2.5 py-1.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+          placeholder="시작" className="flex-1 min-w-0 bg-stone-50 rounded-lg px-2 py-1.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
         <input type="text" inputMode="decimal" value={ev} onChange={(e) => oe(e.target.value.replace(/[^0-9]/g, ''))}
-          placeholder="끝" className="flex-1 bg-stone-50 rounded-lg px-2.5 py-1.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+          placeholder="끝" className="flex-1 min-w-0 bg-stone-50 rounded-lg px-2 py-1.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
         <input type="text" inputMode="decimal" value={rv} onChange={(e) => or(e.target.value.replace(/[^0-9]/g, ''))}
-          placeholder="권" className="w-20 bg-stone-50 rounded-lg px-2.5 py-1.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+          placeholder="권" className="w-14 shrink-0 bg-stone-50 rounded-lg px-2 py-1.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
       </div>
     </div>
   );
