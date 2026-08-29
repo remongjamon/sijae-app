@@ -859,14 +859,14 @@ function PensionInput({ setVal, singleVal, onSet, onSingle, currentStock, soldTh
       </div>
       <div className="grid grid-cols-2 gap-1.5">
         <div className="flex items-center gap-1">
-          <span className="text-[10px] text-stone-500 w-8">세트</span>
+          <span className="text-[10px] text-stone-500 shrink-0 whitespace-nowrap">세트</span>
           <input type="text" inputMode="numeric" value={setVal} 
             onChange={(e) => onSet(e.target.value.replace(/[^0-9]/g, ''))}
             placeholder="0" 
             className="flex-1 bg-stone-50 rounded-lg px-2 py-1.5 text-xs text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-[10px] text-stone-500 w-8">낱장</span>
+          <span className="text-[10px] text-stone-500 shrink-0 whitespace-nowrap">낱장</span>
           <input type="text" inputMode="numeric" value={singleVal} 
             onChange={(e) => onSingle(e.target.value.replace(/[^0-9]/g, ''))}
             placeholder="0" 
