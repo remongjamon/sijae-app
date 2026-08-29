@@ -96,17 +96,19 @@ function nextNum(end, roll) {
   if (isNaN(n) || n <= 0) return '';
   return String((n % roll) + 1);
 }
-function t1Cnt(s, e) {
+function t1Cnt(s, e, rolls) {
   if (s === '' || e === '' || s == null || e == null) return 0;
   const a = Number(s), b = Number(e);
   if (isNaN(a) || isNaN(b)) return 0;
-  return b < a ? b - a + R1 + 1 : b - a + 1;
+  const r = toN(rolls);
+  return b - a + 1 + (r * R1);
 }
-function t2Cnt(s, e) {
+function t2Cnt(s, e, rolls) {
   if (s === '' || e === '' || s == null || e == null) return 0;
   const a = Number(s), b = Number(e);
   if (isNaN(a) || isNaN(b)) return 0;
-  return b < a ? b - a + R2 + 1 : b - a + 1;
+  const r = toN(rolls);
+  return b - a + 1 + (r * R2);
 }
 function prevKey(d, sh) {
   if (sh === '오전') return addD(d, -1) + ':야간';
@@ -121,7 +123,9 @@ function lottoRefKey(d, sh) {
 function emptyRec() {
   return {
     t1s: '', t1e: '', t2s: '', t2e: '',
-    pension: '', lotto: '', lottoPay: '', paperPay: '', transfer: '',
+    pension: '', pensionSet: '', pensionSingle: '',
+    lotto: '', lottoPay: '', paperPay: '', transfer: '',
+    t1Rolls: '', t2Rolls: '',
     b50k: '', b10k: '', b5k: '', b1k: '', bEtc: '',
     note: '', handover: '', martDeposit: '',
   };
@@ -130,9 +134,12 @@ function getCash(r) {
   return toN(r.b50k) * 50000 + toN(r.b10k) * 10000 + toN(r.b5k) * 5000 + toN(r.b1k) * 1000 + toN(r.bEtc);
 }
 function calcDerived(rec, shift, refRec, sijae) {
-  const t1 = t1Cnt(rec.t1s, rec.t1e);
-  const t2 = t2Cnt(rec.t2s, rec.t2e);
-  const pension = toN(rec.pension);
+  const t1 = t1Cnt(rec.t1s, rec.t1e, rec.t1Rolls);
+  const t2 = t2Cnt(rec.t2s, rec.t2e, rec.t2Rolls);
+  const pensionSet = toN(rec.pensionSet);
+  const pensionSingle = toN(rec.pensionSingle);
+  const pension = pensionSet * 5000 + pensionSingle * 1000 + (rec.pensionSet === '' && rec.pensionSingle === '' ? toN(rec.pension) : 0);
+  const pensionCount = pensionSet * 5 + pensionSingle + (rec.pensionSet === '' && rec.pensionSingle === '' ? Math.floor(toN(rec.pension) / 1000) : 0);
   const lotto = toN(rec.lotto);
   const lottoPay = toN(rec.lottoPay);
   const paperPay = toN(rec.paperPay);
@@ -149,7 +156,7 @@ function calcDerived(rec, shift, refRec, sijae) {
   const hasCash = rec.b50k !== '' || rec.b10k !== '' || rec.b5k !== '' || rec.b1k !== '' || rec.bEtc !== '';
   const variance = hasCash ? cash - (totalSales - totalPay - transfer) - sijae : null;
   const deposit = hasCash ? cash - sijae : null;
-  return { t1, t2, pureSales, purePay, totalSales, totalPay, variance, deposit, cash };
+  return { t1, t2, pureSales, purePay, totalSales, totalPay, variance, deposit, cash, pensionCount };
 }
 
 /* ── device id ── */
@@ -527,7 +534,7 @@ export default function App() {
       </header>
 
       <main className="max-w-lg mx-auto">
-        {tab === 'input' && <InputView recs={recs} sett={sett} onSave={saveRec} />}
+      {tab === 'input' && <InputView recs={recs} sett={sett} incoming={incoming} initStock={initStock} onSave={saveRec} />}
         {tab === 'history' && (
           <HistoryView recs={recs} sett={sett} isA={isA}
             onDel={(d, s) => needAdmin(() => delRec(d, s))} />
@@ -576,7 +583,7 @@ export default function App() {
 }
 
 /* ══════ INPUT VIEW ══════ */
-function InputView({ recs, sett, onSave }) {
+function InputView({ recs, sett, incoming, initStock, onSave }) {
   const [dateStr, setDate] = useState(todayStr());
   const [shift, setShift] = useState('오전');
   const [form, setForm] = useState(emptyRec());
@@ -611,6 +618,40 @@ function InputView({ recs, sett, onSave }) {
   }, [key]);
 
   const d = useMemo(() => calcDerived(form, shift, lRef, sett.sijae), [form, shift, lRef, sett.sijae]);
+    // 이번 근무 시작 시점 연금복권 재고 계산
+    const pensionCurrentStock = useMemo(() => {
+      const initDate = initStock.date || todayStr();
+      let stock = initStock.pen || 0;
+      
+      // 초기 재고 날짜부터 오늘까지 입고/판매 누적
+      Object.entries(incoming).forEach(([ds, inc]) => {
+        if (ds >= initDate && ds <= dateStr) {
+          stock += (inc.pen || 0) - (inc.rpen || 0);
+        }
+      });
+      
+      // 이번 근무 이전까지의 판매 차감
+      Object.entries(recs).forEach(([k, rec]) => {
+        const [rDs, rSh] = k.split(':');
+        if (rDs < initDate) return;
+        // 이번 근무 자신은 제외 (실시간 계산은 form에서)
+        if (rDs === dateStr && rSh === shift) return;
+        if (rDs > dateStr) return;
+        if (rDs === dateStr) {
+          // 같은 날짜의 이전 근무만 포함
+          const shiftIdx = SHIFTS.indexOf(shift);
+          const rShiftIdx = SHIFTS.indexOf(rSh);
+          if (rShiftIdx >= shiftIdx) return;
+        }
+        const setV = toN(rec.pensionSet);
+        const singleV = toN(rec.pensionSingle);
+        const hasNew = rec.pensionSet != null || rec.pensionSingle != null;
+        const cnt = setV * 5 + singleV + (hasNew && (setV > 0 || singleV > 0) ? 0 : Math.floor(toN(rec.pension) / 1000));
+        stock -= cnt;
+      });
+      
+      return stock;
+    }, [dateStr, shift, incoming, initStock, recs]);
   const cash = useMemo(() => getCash(form), [form]);
   const up = (k, v) => { setForm((p) => ({ ...p, [k]: v })); setDirty(true); };
   const handleSave = async () => { await onSave(dateStr, shift, form); setDirty(false); };
@@ -662,16 +703,25 @@ function InputView({ recs, sett, onSave }) {
         </div>
       )}
 
-      <Sec t="지류 복권 번호" sub={t1Cnt(form.t1s, form.t1e) + 'T1 · ' + t2Cnt(form.t2s, form.t2e) + 'T2 매'}>
+<Sec t="지류 복권 번호" sub={t1Cnt(form.t1s, form.t1e, form.t1Rolls) + 'T1 · ' + t2Cnt(form.t2s, form.t2e, form.t2Rolls) + 'T2 매'}>
         <div className="space-y-1.5">
-          <TicketRange label="1000원" sv={form.t1s} ev={form.t1e} os={(v) => up('t1s', v)} oe={(v) => up('t1e', v)} cnt={d.t1} />
-          <TicketRange label="2000원" sv={form.t2s} ev={form.t2e} os={(v) => up('t2s', v)} oe={(v) => up('t2e', v)} cnt={d.t2} />
+        <TicketRange label="1000원" sv={form.t1s} ev={form.t1e} rv={form.t1Rolls}
+            os={(v) => up('t1s', v)} oe={(v) => up('t1e', v)} or={(v) => up('t1Rolls', v)} cnt={d.t1} />
+          <TicketRange label="2000원" sv={form.t2s} ev={form.t2e} rv={form.t2Rolls}
+            os={(v) => up('t2s', v)} oe={(v) => up('t2e', v)} or={(v) => up('t2Rolls', v)} cnt={d.t2} />
         </div>
       </Sec>
 
       <Sec t="판매">
         <div className="space-y-1.5">
-          <MoneyIn label="연금복권" value={form.pension} onChange={(v) => up('pension', v)} />
+          <PensionInput 
+            setVal={form.pensionSet} 
+            singleVal={form.pensionSingle}
+            onSet={(v) => up('pensionSet', v)}
+            onSingle={(v) => up('pensionSingle', v)}
+            currentStock={pensionCurrentStock}
+            soldThisShift={d.pensionCount}
+          />
           <MoneyIn label="로또" value={form.lotto} onChange={(v) => up('lotto', v)} />
         </div>
       </Sec>
@@ -776,23 +826,61 @@ function InputView({ recs, sett, onSave }) {
   );
 }
 
-function TicketRange({ label, sv, ev, os, oe, cnt }) {
+function TicketRange({ label, sv, ev, rv, os, oe, or, cnt }) {
   return (
     <div className="bg-white border border-stone-200 rounded-xl p-2.5">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs font-medium">{label}</span>
         <span className="text-[10px] text-stone-500 tabular-nums">{cnt}매</span>
       </div>
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="flex gap-2.5">
         <input type="text" inputMode="decimal" value={sv} onChange={(e) => os(e.target.value.replace(/[^0-9]/g, ''))}
-          placeholder="시작" className="w-full bg-stone-50 rounded-lg px-2.5 py-1.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+          placeholder="시작" className="flex-1 bg-stone-50 rounded-lg px-2.5 py-1.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
         <input type="text" inputMode="decimal" value={ev} onChange={(e) => oe(e.target.value.replace(/[^0-9]/g, ''))}
-          placeholder="끝" className="w-full bg-stone-50 rounded-lg px-2.5 py-1.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+          placeholder="끝" className="flex-1 bg-stone-50 rounded-lg px-2.5 py-1.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+        <input type="text" inputMode="decimal" value={rv} onChange={(e) => or(e.target.value.replace(/[^0-9]/g, ''))}
+          placeholder="권" className="w-20 bg-stone-50 rounded-lg px-2.5 py-1.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
       </div>
     </div>
   );
 }
-
+function PensionInput({ setVal, singleVal, onSet, onSingle, currentStock, soldThisShift }) {
+  const setNum = toN(setVal);
+  const singleNum = toN(singleVal);
+  const setAmount = setNum * 5000;
+  const singleAmount = singleNum * 1000;
+  const totalAmount = setAmount + singleAmount;
+  const totalCount = setNum * 5 + singleNum;
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl p-2.5 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium">연금복권</span>
+        <span className="text-[10px] text-stone-500 tabular-nums">{totalCount}장 · {won(totalAmount)}원</span>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-stone-500 w-8">세트</span>
+          <input type="text" inputMode="numeric" value={setVal} 
+            onChange={(e) => onSet(e.target.value.replace(/[^0-9]/g, ''))}
+            placeholder="0" 
+            className="flex-1 bg-stone-50 rounded-lg px-2 py-1.5 text-xs text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-stone-500 w-8">낱장</span>
+          <input type="text" inputMode="numeric" value={singleVal} 
+            onChange={(e) => onSingle(e.target.value.replace(/[^0-9]/g, ''))}
+            placeholder="0" 
+            className="flex-1 bg-stone-50 rounded-lg px-2 py-1.5 text-xs text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+        </div>
+      </div>
+      {currentStock > 0 && (
+        <div className="text-[9px] text-stone-400 text-right">
+          이번 근무 {soldThisShift}장 / 재고 {currentStock - soldThisShift}장
+        </div>
+      )}
+    </div>
+  );
+}
 function MoneyIn({ label, value, onChange }) {
   return (
     <div className="bg-white border border-stone-200 rounded-xl px-3 py-2 flex items-center gap-2">
@@ -1069,9 +1157,9 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
       SHIFTS.forEach((sh) => {
         const rec = recs[ds + ':' + sh];
         if (!rec) return;
-        s1 += t1Cnt(rec.t1s, rec.t1e);
-        s2 += t2Cnt(rec.t2s, rec.t2e);
-        sp += Math.floor(toN(rec.pension) / 1000);
+        s1 += t1Cnt(rec.t1s, rec.t1e, rec.t1Rolls);
+        s2 += t2Cnt(rec.t2s, rec.t2e, rec.t2Rolls);
+        sp += (toN(rec.pensionSet) * 5 + toN(rec.pensionSingle)) + (rec.pensionSet === '' && rec.pensionSingle === '' && rec.pensionSet == null ? Math.floor(toN(rec.pension) / 1000) : 0);
       });
       const inc = incoming[ds] || { t1: 0, t2: 0, pen: 0 };
       arr.push({ ds, sold: { t1: s1, t2: s2, pen: sp }, inc });
@@ -1088,9 +1176,9 @@ function InventoryView({ recs, incoming, initStock, onSaveIncoming, onSaveInitSt
     Object.entries(recs).forEach(([k, rec]) => {
       const ds = k.split(':')[0];
       if (ds >= initDate && ds < monthStart) {
-        preT1 += t1Cnt(rec.t1s, rec.t1e);
-        preT2 += t2Cnt(rec.t2s, rec.t2e);
-        prePen += Math.floor(toN(rec.pension) / 1000);
+        preT1 += t1Cnt(rec.t1s, rec.t1e, rec.t1Rolls);
+        preT2 += t2Cnt(rec.t2s, rec.t2e, rec.t2Rolls);
+        prePen += (toN(rec.pensionSet) * 5 + toN(rec.pensionSingle)) + (rec.pensionSet === '' && rec.pensionSingle === '' && rec.pensionSet == null ? Math.floor(toN(rec.pension) / 1000) : 0);
       }
     });
     Object.entries(incoming).forEach(([ds, inc]) => {
@@ -1360,6 +1448,6 @@ function SettingsView({ sett, devices, onSave, onSaveDevices, onBack }) {
         className="w-full bg-stone-900 text-white py-3 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2">
         <Save size={15} /> 저장
       </button>
-    </div>
+      </div>
   );
 }
