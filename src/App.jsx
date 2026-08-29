@@ -857,20 +857,20 @@ function PensionInput({ setVal, singleVal, onSet, onSingle, currentStock, soldTh
         <span className="text-xs font-medium">연금복권</span>
         <span className="text-[10px] text-stone-500 tabular-nums">{totalCount}장 · {won(totalAmount)}원</span>
       </div>
-      <div className="flex gap-2 w-full min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <span className="text-[10px] text-stone-500 shrink-0 whitespace-nowrap">세트</span>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <div className="text-[10px] text-stone-500 mb-1 ml-0.5">세트</div>
           <input type="text" inputMode="numeric" value={setVal} 
             onChange={(e) => onSet(e.target.value.replace(/[^0-9]/g, ''))}
             placeholder="0" 
-            className="flex-1 bg-stone-50 rounded-lg px-2 py-1.5 text-xs text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+            className="w-full bg-stone-50 rounded-lg px-2 py-1.5 text-xs text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
         </div>
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <span className="text-[10px] text-stone-500 shrink-0 whitespace-nowrap">낱장</span>
+        <div>
+          <div className="text-[10px] text-stone-500 mb-1 ml-0.5">낱장</div>
           <input type="text" inputMode="numeric" value={singleVal} 
             onChange={(e) => onSingle(e.target.value.replace(/[^0-9]/g, ''))}
             placeholder="0" 
-            className="flex-1 bg-stone-50 rounded-lg px-2 py-1.5 text-xs text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
+            className="w-full bg-stone-50 rounded-lg px-2 py-1.5 text-xs text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-stone-400" />
         </div>
       </div>
       {currentStock > 0 && (
