@@ -140,7 +140,7 @@ function emptyRec() {
 function getCash(r) {
   return toN(r.b50k) * 50000 + toN(r.b10k) * 10000 + toN(r.b5k) * 5000 + toN(r.b1k) * 1000 + toN(r.bEtc);
 }
-function calcDerived(rec, shift, refRec, sijae) {
+function calcDerived(rec, shift, refRec, sijae, dateStr) {
   const t1 = t1Cnt(rec.t1s, rec.t1e, rec.t1Rolls);
   const t2 = t2Cnt(rec.t2s, rec.t2e, rec.t2Rolls);
   const pensionSet = toN(rec.pensionSet);
@@ -149,21 +149,28 @@ function calcDerived(rec, shift, refRec, sijae) {
   const pensionCount = pensionSet * 5 + pensionSingle + (rec.pensionSet === '' && rec.pensionSingle === '' ? Math.floor(toN(rec.pension) / 1000) : 0);
   const lotto = toN(rec.lotto);
   const lottoPay = toN(rec.lottoPay);
-  const paperPay = toN(rec.paperPay);
-  const transfer = toN(rec.transfer);
+  const paperPayCum = toN(rec.paperPay);
+  const transferCum = toN(rec.transfer);
   const cash = getCash(rec);
   let pureSales = lotto;
   let purePay = lottoPay;
+  let paperPay = paperPayCum;
+  let transfer = transferCum;
   if (shift !== '오전' && refRec) {
     pureSales = lotto - toN(refRec.lotto);
     purePay = lottoPay - toN(refRec.lottoPay);
+    // 지류지급, 계좌이체 누적 적용은 2026-09-04 근무분부터
+    if (dateStr && dateStr >= '2026-09-04') {
+      paperPay = paperPayCum - toN(refRec.paperPay);
+      transfer = transferCum - toN(refRec.transfer);
+    }
   }
   const totalSales = t1 * 1000 + t2 * 2000 + pension + pureSales;
   const totalPay = paperPay + purePay;
   const hasCash = rec.b50k !== '' || rec.b10k !== '' || rec.b5k !== '' || rec.b1k !== '' || rec.bEtc !== '';
   const variance = hasCash ? cash - (totalSales - totalPay - transfer) - sijae : null;
   const deposit = hasCash ? cash - sijae : null;
-  return { t1, t2, pureSales, purePay, totalSales, totalPay, variance, deposit, cash, pensionCount };
+  return { t1, t2, pureSales, purePay, totalSales, totalPay, variance, deposit, cash, pensionCount, transfer, paperPay };
 }
 
 /* ── device id ── */
@@ -624,7 +631,7 @@ function InputView({ recs, sett, incoming, initStock, onSave }) {
     setDirty(false);
   }, [key]);
 
-  const d = useMemo(() => calcDerived(form, shift, lRef, sett.sijae), [form, shift, lRef, sett.sijae]);
+  const d = useMemo(() => calcDerived(form, shift, lRef, sett.sijae, dateStr), [form, shift, lRef, sett.sijae]);
     // 이번 근무 시작 시점 연금복권 재고 계산
     const pensionCurrentStock = useMemo(() => {
       const initDate = initStock.date || todayStr();
@@ -799,7 +806,7 @@ function InputView({ recs, sett, incoming, initStock, onSave }) {
       <div className="bg-stone-900 text-white rounded-2xl p-4 space-y-1.5">
         <SumRow label="총 판매액" value={won(d.totalSales)} />
         <SumRow label="총 지급액" value={won(d.totalPay)} />
-        <SumRow label="계좌이체" value={won(toN(form.transfer))} />
+        <SumRow label="계좌이체" value={won(d.transfer)} />
         <SumRow label="현금 총액" value={won(cash)} />
         <div className="border-t border-white/20 my-1.5" />
         <SumRow label="시재 기준" value={won(sett.sijae)} muted />
@@ -932,7 +939,7 @@ function HistoryView({ recs, sett, isA, onDel }) {
       if (!ds.startsWith(month)) return;
       const lrk = lottoRefKey(ds, sh);
       const lr = lrk ? recs[lrk] : null;
-      const d = calcDerived(rec, sh, lr, sett.sijae);
+      const d = calcDerived(rec, sh, lr, sett.sijae, ds);
       arr.push({ k, ds, sh, rec, d });
     });
     arr.sort((a, b) => {
@@ -1036,7 +1043,7 @@ function ReportView({ recs, sett }) {
       if (ds < range.f || ds > range.t) return;
       const lrk = lottoRefKey(ds, sh);
       const lr = lrk ? recs[lrk] : null;
-      const d = calcDerived(rec, sh, lr, sett.sijae);
+      const d = calcDerived(rec, sh, lr, sett.sijae, ds);
       sales += d.totalSales; pay += d.totalPay;
       dep += d.deposit || 0; va += d.variance || 0;
       tk1 += d.t1; tk2 += d.t2; pen += toN(rec.pension); lottoSales += d.pureSales; lottoPay += d.purePay;
