@@ -548,7 +548,7 @@ export default function App() {
       </header>
 
       <main className="max-w-lg mx-auto">
-      {tab === 'input' && <InputView recs={recs} sett={sett} incoming={incoming} initStock={initStock} onSave={saveRec} />}
+      {tab === 'input' && <InputView recs={recs} sett={sett} incoming={incoming} initStock={initStock} isA={isA} onSave={saveRec} />}
         {tab === 'history' && (
           <HistoryView recs={recs} sett={sett} isA={isA}
             onDel={(d, s) => needAdmin(() => delRec(d, s))} />
@@ -597,8 +597,15 @@ export default function App() {
 }
 
 /* ══════ INPUT VIEW ══════ */
-function InputView({ recs, sett, incoming, initStock, onSave }) {
+function InputView({ recs, sett, incoming, initStock, isA, onSave }) {
   const [dateStr, setDate] = useState(todayStr());
+  
+  // 근무자 모드면 날짜를 항상 오늘로 고정
+  useEffect(() => {
+    if (!isA && dateStr !== todayStr()) {
+      setDate(todayStr());
+    }
+  }, [isA]);
   const [shift, setShift] = useState('오전');
   const [form, setForm] = useState(emptyRec());
   const [dirty, setDirty] = useState(false);
@@ -673,13 +680,22 @@ function InputView({ recs, sett, incoming, initStock, onSave }) {
   return (
     <div className="p-4 space-y-3">
       <div className="bg-white rounded-2xl border border-stone-200 p-3">
-        <div className="flex items-center justify-between mb-2">
-          <button onClick={() => setDate(addD(dateStr, -1))} className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-500">
+      <div className="flex items-center justify-between mb-2">
+          <button onClick={() => isA && setDate(addD(dateStr, -1))} disabled={!isA}
+            className={'p-1.5 rounded-lg ' + (isA ? 'hover:bg-stone-100 text-stone-500' : 'text-stone-300')}>
             <ChevronLeft size={18} />
           </button>
-          <input type="date" value={dateStr} onChange={(e) => setDate(e.target.value)}
-            className="text-center text-sm font-semibold bg-transparent focus:outline-none" />
-          <button onClick={() => setDate(addD(dateStr, 1))} className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-500">
+          {isA ? (
+            <input type="date" value={dateStr} onChange={(e) => setDate(e.target.value)}
+              className="text-center text-sm font-semibold bg-transparent focus:outline-none" />
+          ) : (
+            <span className="text-center text-sm font-semibold flex items-center gap-1">
+              {dateStr}
+              <Lock size={11} className="text-stone-400" />
+            </span>
+          )}
+          <button onClick={() => isA && setDate(addD(dateStr, 1))} disabled={!isA}
+            className={'p-1.5 rounded-lg ' + (isA ? 'hover:bg-stone-100 text-stone-500' : 'text-stone-300')}>
             <ChevronRight size={18} />
           </button>
         </div>
