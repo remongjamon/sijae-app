@@ -980,8 +980,7 @@ function HistoryView({ recs, sett, isA, onDel }) {
             <div className="border-t border-stone-100 p-3 bg-stone-50 text-[11px] space-y-1">
               <DetailRow l="1000원" v={d.t1 + '매 · ' + won(d.t1 * 1000) + '원'} />
               <DetailRow l="2000원" v={d.t2 + '매 · ' + won(d.t2 * 2000) + '원'} />
-              <DetailRow l="연금복권" v={won(toN(rec.pension)) + '원'} />
-              <DetailRow l="로또 판매" v={won(d.pureSales) + '원'} />
+              <DetailRow l="연금복권" v={won((toN(rec.pensionSet) * 5000 + toN(rec.pensionSingle) * 1000) || toN(rec.pension)) + '원'} />              <DetailRow l="로또 판매" v={won(d.pureSales) + '원'} />
               <DetailRow l="로또 지급" v={won(d.purePay) + '원'} />
               <DetailRow l="지류지급" v={won(toN(rec.paperPay)) + '원'} />
               <DetailRow l="계좌이체" v={won(toN(rec.transfer)) + '원'} />
@@ -1046,8 +1045,7 @@ function ReportView({ recs, sett }) {
       const d = calcDerived(rec, sh, lr, sett.sijae, ds);
       sales += d.totalSales; pay += d.totalPay;
       dep += d.deposit || 0; va += d.variance || 0;
-      tk1 += d.t1; tk2 += d.t2; pen += toN(rec.pension); lottoSales += d.pureSales; lottoPay += d.purePay;
-      n++;
+      tk1 += d.t1; tk2 += d.t2; pen += (toN(rec.pensionSet) * 5000 + toN(rec.pensionSingle) * 1000) || toN(rec.pension); lottoSales += d.pureSales; lottoPay += d.purePay;      n++;
       if (d.variance != null && d.variance !== 0) vbd[ds] = (vbd[ds] || 0) + d.variance;
     });
     return { n, sales, pay, dep, va, tk1, tk2, pen, lottoSales, lottoPay, vbd };
