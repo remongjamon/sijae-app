@@ -105,6 +105,10 @@ function t1Cnt(s, e, rolls) {
   if (r === 0) {
     return b < a ? b - a + R1 + 1 : b - a + 1;
   }
+  // 권 값이 있고 끝<시작이면 wrap된 1권은 이미 포함
+  if (b < a) {
+    return b - a + R1 + 1 + ((r - 1) * R1);
+  }
   return b - a + 1 + (r * R1);
 }
 function t2Cnt(s, e, rolls) {
@@ -114,6 +118,9 @@ function t2Cnt(s, e, rolls) {
   const r = toN(rolls);
   if (r === 0) {
     return b < a ? b - a + R2 + 1 : b - a + 1;
+  }
+  if (b < a) {
+    return b - a + R2 + 1 + ((r - 1) * R2);
   }
   return b - a + 1 + (r * R2);
 }
